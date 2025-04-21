@@ -1,7 +1,7 @@
 import networkx as nx
 from typing import Dict, List
 
-# ---------------- 1. network & values ----------------
+# 1. Global parameters
 K = 3
 vals: Dict[str, int] = {
     'A': 3, 'B': 1, 'C': 2,
@@ -20,7 +20,7 @@ G.add_edges_from([
 
 depth = dict(nx.single_source_shortest_path_length(G,'s'))
 
-# ---------------- 2. build blocks --------------------
+# 2. build blocks
 blocks = {}                                   # root -> list of members
 for root in G.successors('s'):                # only depth‑1 neighbours
     members = [root]                          # include the root itself
@@ -28,7 +28,7 @@ for root in G.successors('s'):                # only depth‑1 neighbours
     members += [c for c in G.successors(root) if depth[c] == 2]
     blocks[root] = members
 
-# ---------------- 3. allocation ---------------------
+# 3. allocation
 left = K
 winners: List[str] = []
 
@@ -58,13 +58,13 @@ while left > 0:
     else:                                     # depth‑2 node wins → remove node
         blocks[best_block].remove(best_node)
 
-# ---------------- 4. payments ------------------------
+# 4. payments 
 payments = {b: 0 for b in vals}
 for w in winners:
     if depth[w] == 2:
         payments[w] = vals[w]                # critical price = own bid
 
-# ---------------- 5. stats ---------------------------
+# 5. output
 SW       = sum(vals[w] for w in winners)
 revenue  = sum(payments.values())
 

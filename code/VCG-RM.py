@@ -12,9 +12,7 @@ from typing import Dict, List, Set
 #    v_k(·) = k‑th largest bid in that set  (return 0 if size < k)
 
 
-# ----------------------------------------------------------------------
-#  1. Input data 
-# ----------------------------------------------------------------------
+#  1. Global parameters
 K = 3  # number of identical goods
 
 valuations: Dict[str, int] = {
@@ -31,9 +29,7 @@ G.add_edges_from([
     ('C', 'D'),
     ('D', 'E'), ('D', 'I'),
 ])
-# ----------------------------------------------------------------------
 # 2. Helpers
-# ----------------------------------------------------------------------
 def invite_subtree(graph: nx.DiGraph, root: str) -> Set[str]:
     """
     Return the set of bidders whose presence requires `root`'s invitation.
@@ -54,16 +50,12 @@ def kth_bid(bidders: List[str], k: int) -> int:
     bids = sorted((valuations[b] for b in bidders), reverse=True)
     return bids[k - 1] if len(bids) >= k else 0
 
-# ----------------------------------------------------------------------
 # 3. Allocation
-# ----------------------------------------------------------------------
 all_bidders           = list(valuations)
 winners: List[str]    = sorted(all_bidders, key=lambda x: -valuations[x])[:K]
 social_welfare: int   = sum(valuations[i] for i in winners)
 
-# ----------------------------------------------------------------------
 # 4. Payments (VCG‑RM)
-# ----------------------------------------------------------------------
 vk_N = kth_bid(all_bidders, K)         # global k‑th bid, used for losers
 payments: Dict[str, int] = {}
 
@@ -77,9 +69,8 @@ for bidder in all_bidders:
         payments[bidder] = vk_sub - vk_N
 
 revenue = sum(payments.values())
-# ----------------------------------------------------------------------
-# 5. Report 
-# ----------------------------------------------------------------------
+
+# 5. output
 print("=== VCG-RM Mechanism Simulation ===")
 print("Social Welfare (SW):", social_welfare)
 print("Revenue  (Rev):", revenue)

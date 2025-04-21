@@ -1,9 +1,7 @@
 import networkx as nx
 from typing import Dict, List, Tuple
 
-# ----------------------------------------------------------------------
 # 1. Global parameters
-# ----------------------------------------------------------------------
 K: int = 3  # number of homogeneous goods the seller wants to sell
 
 valuations: Dict[str, int] = {         # private values of each bidder
@@ -16,9 +14,7 @@ valuations: Dict[str, int] = {         # private values of each bidder
     'I': 4,
 }
 
-# ----------------------------------------------------------------------
 # 2. Build the directed social network  (seller node = 's')
-# ----------------------------------------------------------------------
 G = nx.DiGraph()
 
 G.add_edges_from([
@@ -29,15 +25,8 @@ G.add_edges_from([
     ('D', 'E'), ('D', 'I')
 ])
 
-# ----------------------------------------------------------------------
 # 3. Helpers
-# ----------------------------------------------------------------------
 def invite_subtree(graph: nx.DiGraph, source: str) -> set:
-    """
-    Return {source} all nodes reachable from `source`
-    (i.e. the set that enters the auction only if `source` invites truthfully).
-    This is exactly the “domination” removal used in the diffusion‑VCG payment.
-    """
     seen, stack = set(), [source]
     while stack:
         node = stack.pop()
@@ -48,9 +37,7 @@ def invite_subtree(graph: nx.DiGraph, source: str) -> set:
     return seen
 
 
-# ----------------------------------------------------------------------
 # 4. VCG allocation & payment
-# ----------------------------------------------------------------------
 def vcg_allocation() -> List[str]:
     """Choose the top-K bidders by value (ties broken arbitrarily)."""
     bidders = list(valuations)
@@ -82,9 +69,7 @@ def vcg_payment() -> Tuple[List[str], int, Dict[str, int]]:
     return winners, sw_total, payments
 
 
-# ----------------------------------------------------------------------
-# 5. Run and pretty‑print
-# ----------------------------------------------------------------------
+# 5. output
 if __name__ == "__main__":
     winners, sw, pay = vcg_payment()
     revenue = sum(pay.values())

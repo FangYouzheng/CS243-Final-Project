@@ -1,7 +1,7 @@
 import networkx as nx
 from typing import Dict, List, Set
 
-# ---------------- 1. data ----------------
+# 1. Global parameters
 K = 3
 vals: Dict[str, int] = {
     'A': 3, 'B': 1, 'C': 2,
@@ -18,14 +18,14 @@ G.add_edges_from([
     ('D', 'E'), ('D', 'I')
 ])
 
-# ---------------- 2. helper ----------------
+# 2. helper 
 depth = dict(nx.single_source_shortest_path_length(G, 's'))   # BFS depth
 
 def local_set() -> Set[str]:
     """Nodes allowed to compete (depth ≤ 2, excluding seller)."""
     return {v for v,d in depth.items() if d <= 2 and v != 's'}
 
-# ---------------- 3. allocation -----------
+# 3. allocation 
 winners: List[str] = []
 candidates: Set[str] = set(local_set())
 left = K
@@ -41,13 +41,13 @@ while left > 0 and candidates:
     # remove the picked node itself from future consideration
     candidates.remove(pick)
 
-# ---------------- 4. payments -------------
+# 4. payments
 payments = {b: 0 for b in vals}           # losers & depth‑1 winners pay 0
 for w in winners:
     if depth[w] == 2:                     # depth‑2 winners pay their own bid
         payments[w] = vals[w]
 
-# ---------------- 5. stats ----------------
+# 5. output
 SW      = sum(vals[w] for w in winners)
 revenue = sum(payments.values())
 
