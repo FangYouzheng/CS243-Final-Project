@@ -1,93 +1,100 @@
-import networkx as nx
-from typing import Dict, List, Set
+from collections import deque
 
-# 1. parameters
-K = 3  # number of identical items
+def build_idt(parent):
+    # 构建邀约支配树(subtree)
+    children = {}
+    for i, p in parent.items():
+        children.setdefault(p, []).append(i)
+    def dfs(u):
+        s = {u}
+        for v in children.get(u, []):
+            s |= dfs(v)
+        return s
+    return {i: dfs(i) for i in parent}
 
-vals: Dict[str, int] = {          # bidders' true valuations
-    'A': 3, 'B': 1, 'C': 2,
-    'D': 100, 'E': 5,
-    'H': 2,  'I': 4,
-}
+def bfs_order(adj, seller='s'):
+    # BFS 顺序
+    q = deque([seller]); seen = {seller}; order = []
+    while q:
+        u = q.popleft()
+        for v in adj.get(u, []):
+            if v not in seen:
+                seen.add(v)
+                order.append(v)
+                q.append(v)
+    return order
 
-# If we want to reproduce the result given in the paper, we should change 'H': 2 -> 'H': 1
-
-# directed social network (seller is node 's')
-G = nx.DiGraph()
-G.add_edges_from([
-    ('s', 'A'), ('s', 'B'),
-    ('A', 'H'),
-    ('B', 'C'),
-    ('C', 'D'),
-    ('D', 'E'), ('D', 'I')
-])
-
-bidders = list(vals)  # convenience list
-
-# 2. helpers 
-def bfs_order(root: str = 's') -> List[str]:
-    """BFS traversal order excluding the root (seller)."""
-    return [n for n in nx.bfs_tree(G, root) if n != root]
-
-def domination_subtree(node: str) -> Set[str]:
-    """Invitation‑domination subtree rooted at `node`."""
-    return nx.descendants(G, node) | {node}
-
-def kth_bid(cands: List[str], k: int) -> int:
+def dna_mu_r_alloc(adj, parent, vals, K):
     """
-    Return k‑th highest bid among `cands`.
-    If fewer than k candidates, return −∞ so the inequality fails.
+    Allocation 阶段：按 BFS 顺序，用动态阈值分配，剩余 k 递减
     """
-    if len(cands) < k:
-        return float("-inf")
-    return sorted((vals[b] for b in cands), reverse=True)[k - 1]
-
-# 3. allocation
-def dna_mu_r_allocation() -> List[str]:
-    """Implement Algorithm 2 – return winner list."""
-    left = K
-    winners: List[str] = []
-    for i in bfs_order():                # step through BFS order
-        Ti      = domination_subtree(i)  # bidders dominated by i
-        others  = [b for b in bidders if b not in Ti]
-        thresh  = kth_bid(others, left)  # v_k(N \ Ti)
-        if vals[i] >= thresh and left > 0:
-            winners.append(i)
-            left -= 1
-        if left == 0:
+    O = bfs_order(adj, seller='s')
+    subtree = build_idt(parent)
+    f = {i: 0 for i in vals}
+    winners = []
+    remaining = K
+    for i in O:
+        if remaining <= 0:
             break
-    return winners
+        outside = sorted([vals[j] for j in vals if j not in subtree[i]], reverse=True)
+        thresh = outside[remaining-1] if len(outside) >= remaining else 0
+        if vals[i] >= thresh:
+            f[i] = 1
+            winners.append(i)
+            remaining -= 1
+    return f, winners
 
-# 4. critical bids
-def wins_with_bid(bidder: str, bid: int) -> bool:
-    """Check if `bidder` would still win when bidding `bid`."""
-    original = vals[bidder]
-    vals[bidder] = bid
-    res = bidder in dna_mu_r_allocation()
-    vals[bidder] = original
-    return res
-
-def critical_bid(bidder: str) -> int:
+def compute_payments(adj, parent, vals, K):
     """
-    Smallest integer b ∈ [0, v_i] making bidder win.
-    Range is tiny in the example, linear scan is fine.
+    分别计算静态门槛与动态门槛：
+      - p_static[i]：外部第 K 高
+      - p_dynamic[i]：每步剩余 k 时的外部第 k 高
     """
-    for b in range(vals[bidder] + 1):
-        if wins_with_bid(bidder, b):
-            return b
-    return vals[bidder]  # fallback (should not be reached)
+    subtree = build_idt(parent)
+    p_static = {}
+    for i in vals:
+        outside = sorted([vals[j] for j in vals if j not in subtree[i]], reverse=True)
+        p_static[i] = outside[K-1] if len(outside) >= K else 0
 
-# 5. execute mechanism 
-winners  = dna_mu_r_allocation()
-payments = {b: (critical_bid(b) if b in winners else 0) for b in bidders}
-sw       = sum(vals[w] for w in winners)
-revenue  = sum(payments.values())
+    p_dynamic = {}
+    O = bfs_order(adj, seller='s')
+    remaining = K
+    for i in O:
+        outside = sorted([vals[j] for j in vals if j not in subtree[i]], reverse=True)
+        if remaining > 0:
+            p_dynamic[i] = outside[remaining-1] if len(outside) >= remaining else 0
+            if vals[i] >= p_dynamic[i]:
+                remaining -= 1
+        else:
+            p_dynamic[i] = 0
+    return p_static, p_dynamic
 
-# 6. output
-print("=== DNA-MU-R Mechanism Simulation ===")
-print("Social Welfare (SW):", sw)
-print("Revenue  (Rev):", revenue)
-print("Winners :", winners)
-print("Payments:")
-for b in sorted(payments):
-    print(f"  {b}: {payments[b]}")
+if __name__ == "__main__":
+    # 图 4 示例
+    adj = {'s': ['A', 'B'], 'A': ['H'], 'B': ['C'], 'C': ['D'], 'D': ['I', 'E']}
+    parent = {'A': 's', 'B': 's', 'H': 'A', 'C': 'B', 'D': 'C', 'I': 'D', 'E': 'D'}
+    vals = {'A':3, 'B':1, 'H':2, 'C':2, 'D':100, 'I':4, 'E':5}
+    K = 3
+
+    # 1. Allocation
+    f, winners = dna_mu_r_alloc(adj, parent, vals, K)
+    # 2. 计算静态&动态门槛
+    p_stat, p_dyn = compute_payments(adj, parent, vals, K)
+    # 3. 支付：前 K−1 位赢家用静态门槛，最后一位赢家用动态门槛
+    p = {i: 0 for i in vals}
+    for idx, i in enumerate(winners):
+        if idx < K-1:
+            p[i] = p_stat[i]
+        else:
+            p[i] = p_dyn[i]
+
+    SW = sum(vals[i] for i in vals if f[i] == 1)
+    Rev = sum(p[i] for i in winners)
+
+    print("=== DNA-MU-R Mechanism Simulation ===")
+    print("Social Welfare (SW):", SW)
+    print("Revenue  (Rev):", Rev)
+    print("Winners :", winners)
+    print("Payments:")
+    for b in sorted(p):
+        print(f"  {b}: {p[b]}")
